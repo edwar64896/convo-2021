@@ -1,0 +1,9 @@
+#include <fftw3.h>
+
+
+
+int
+main(int argc, char ** argv) {
+	printf("fftw timing checker\n");
+	exit(0);
+}

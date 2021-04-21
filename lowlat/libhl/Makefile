@@ -1,0 +1,150 @@
+SHELL = /bin/sh
+
+
+builddir = .
+top_srcdir = .
+srcdir = .
+prefix = /usr/local
+exec_prefix = ${prefix}
+bindir = $(exec_prefix)/bin
+infodir = $(prefix)/info
+libdir = ${exec_prefix}/lib
+includedir = ${prefix}/include
+mandir = $(prefix)/man/man1
+
+CC = gcc
+CPPFLAGS = 
+CFLAGS = $(CPPFLAGS) -g -O2 -D_THREAD_SAFE -pthread -DTHREAD_SAFE -I/usr/local/include
+LDFLAGS =  -L/usr/local/lib
+LIBS = 
+INSTALL = @INSTALL@
+
+UNAME := $(shell uname)
+
+LIBTOOL_DEPS = build-aux/ltmain.sh
+
+ifeq ($(UNAME), Darwin)
+SHAREDFLAGS = -dynamiclib
+SHAREDEXT = dylib
+else
+SHAREDFLAGS = -shared
+SHAREDEXT = so
+endif
+
+ifeq ("$(LIBDIR)", "")
+LIBDIR = $(libdir)
+endif
+
+ifeq ("$(INCDIR)", "")
+INCDIR = $(includedir)
+endif
+
+IS_CLANG := $(shell $(CC) --version | grep clang)
+
+ifneq ("$(IS_CLANG)", "")
+CLANG_FLAGS=-Wno-undefined-inline -Wno-unknown-warning-option -Wno-deprecated-declarations
+endif
+
+TARGETS = $(patsubst $(srcdir)/src/%.c, $(builddir)/%.o, $(wildcard $(srcdir)/src/*.c))
+TESTS = $(patsubst %.c, %, $(wildcard $(top_srcdir)/test/*_test.c))
+
+TEST_EXEC_ORDER = fbuf_test \
+		  rbuf_test \
+		  linklist_test \
+		  hashtable_test \
+		  rqueue_test \
+		  queue_test \
+		  rbtree_test \
+		  avltree_test \
+		  binheap_test \
+		  pqueue_test \
+		  skiplist_test \
+		  trie_test \
+		  graph_test
+
+all: objects static shared
+
+.PHONY: static
+static: objects
+	./libtool --mode=link ar -r -o $(builddir)/libhl.a $(builddir)/*.lo
+
+.PHONY: shared
+shared: objects
+	./libtool --mode=link $(CC) $(LIBS) $(LDFLAGS) -Wc,$(SHAREDFLAGS) -o $(builddir)/libhl.$(SHAREDEXT) $(builddir)/*.o
+
+%.o : $(srcdir)/src/%.c
+	./libtool --mode=compile $(CC) -c $(CFLAGS) $< -o $(builddir)/$@
+
+objects: CFLAGS += -fPIC -I$(top_srcdir)/src -Wall -Werror -Wno-parentheses -Wno-pointer-sign -Wno-unused-function $(CLANG_FLAGS) -g -O3
+objects: libtool $(TARGETS)
+
+libtool: $(LIBTOOL_DEPS)
+	$(SHELL) ./config.status libtool
+
+.PHONY: clean
+clean:
+	@echo "Cleaning libhl"
+	rm -f $(builddir)/*.o
+	rm -f $(builddir)/*.lo
+	rm -f $(top_srcdir)/test/*_test
+	rm -f $(builddir)/libhl.a
+	rm -f $(builddir)/libhl.$(SHAREDEXT)
+	rm -f $(builddir)/libtool
+	@if [ -f $(top_srcdir)/support/libut/libut.a ]; then \
+	    echo "Cleaning libut"; \
+	    make -C $(top_srcdir)/support/libut clean; \
+	fi
+
+
+.PHONY: distclean
+distclean: clean
+	rm -rf config.h Makefile config.log configure autom4te.cache config.status
+
+.PHONY: libut
+libut:
+	@cd $(top_srcdir); if [ ! -f $(top_srcdir)/support/libut/Makefile ]; then git submodule init; git submodule update; fi; cd -; make -C $(top_srcdir)/support/libut
+
+.PHONY:tests
+tests: CFLAGS += -I$(top_srcdir)/src -I$(top_srcdir)/support/libut/src -Wall -Werror -Wno-parentheses -Wno-pointer-sign -Wno-unused-function $(CLANG_FLAGS) -g -O3
+tests: libut static
+	@for i in $(TESTS); do\
+	  echo "$(CC) $(CFLAGS) $$i.c -o $$i libhl.a $(LDFLAGS) -lm";\
+	  $(CC) $(CFLAGS) $$i.c -o $$i libhl.a $(top_srcdir)/support/libut/libut.a $(LDFLAGS) -lm;\
+	done;\
+	CWD=$(pwd);\
+	cd $(top_srcdir)/test/;\
+	for i in $(TEST_EXEC_ORDER); do echo; ./$$i; echo; done;\
+	cd $$CWD;
+
+.PHONY: test
+test: tests
+
+.PHONY: install
+install:
+	 @echo "Installing libraries in $(LIBDIR)"; \
+	 cp -v libhl.a $(LIBDIR)/;\
+	 cp -v libhl.$(SHAREDEXT) $(LIBDIR)/;\
+	 echo "Installing headers in $(INCDIR)"; \
+	 cp -v $(top_srcdir)/src/*.h $(INCDIR)/;
+
+.PHONY: docs
+docs:
+	@doxygen libhl.doxycfg
+
+# automatic re-running of configure if the ocnfigure.in file has changed
+${srcdir}/configure: configure.in aclocal.m4
+	cd ${srcdir} && autoconf
+
+# autoheader might not change config.h.in, so touch a stamp file
+${srcdir}/config.h.in: stamp-h.in
+${srcdir}/stamp-h.in: configure.in aclocal.m4
+	cd ${srcdir} && autoheader
+	echo timestamp > ${srcdir}/stamp-h.in
+
+config.h: stamp-h
+stamp-h: config.h.in config.status
+	./config.status
+Makefile: Makefile.in config.status
+	./config.status
+	config.status: configure
+	./config.status --recheck

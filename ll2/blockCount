@@ -1,0 +1,37 @@
+	ct->priority=priority;
+	return ct->priority;
+	return ct->position;
+	ct->position=position;
+		printf("ct->blockCount=%u\n",ct->blockCount);
+		if (ct->blockCount>=128) {
+	 //printf("task duration = %lu\n",ct->cEnd-ct->cStart);
+			//int firBlock=ct->firBlock;
+			int blockSize=(2 * FRAMESPERBLOCK * strPpKernel->blocksPerSegment[ct->firBlock]); // two blocks per buffer
+					ct->priority, ct->blockStart, ct->blockCount, ct->task1.blockDest, ct->task2.blockDest, ct->firBlock);
+			fftwf_execute(ct->signalPlan);
+			if (ct->blockCount>=128) {
+				pthread_create(&ct->task1.pt,NULL,fConvolutionTaskMultiplyJoin,&ct->task1);
+				pthread_create(&ct->task2.pt,NULL,fConvolutionTaskMultiplyJoin,&ct->task2);
+				fConvolutionTaskMultiplyJoin(&ct->task1);
+				fConvolutionTaskMultiplyJoin(&ct->task2);
+		ct->signal=		     (CFormat*)	fftwf_malloc(sizeof(CFormat) * blockSize);
+		ct->signalFFTW=(fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * 2 * ((blockSize/2)+1));
+		memset(ct->signal,0,sizeof(CFormat) * blockSize);
+		memset(ct->signalFFTW,0,sizeof(fftwf_complex) * 2 * ((blockSize/2)+1));
+		ct->task1.convoFFTW=(fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * 2 * ((blockSize/2)+1));
+		ct->task1.convo=(CFormat*)malloc(sizeof(CFormat) * blockSize);
+		ct->task2.convoFFTW=(fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * 2 * ((blockSize/2)+1));
+		ct->task2.convo=(CFormat*)malloc(sizeof(CFormat) * blockSize);
+		ct->signalPlan =
+           	                    	(float *)ct->signal,NULL,
+									(fftwf_complex*)ct->signalFFTW,NULL,
+		ct->task1.convoPlan =
+									(fftwf_complex*)ct->task1.convoFFTW,NULL,
+           	                    	(float *)ct->task1.convo,NULL,
+		ct->task2.convoPlan =
+									(fftwf_complex*)ct->task2.convoFFTW,NULL,
+           	                    	(float *)ct->task2.convo,NULL,
+		ct->task1.filterFFTW=ppKernel->pFilterFFTW[ri];
+		ct->task2.filterFFTW=ppKernel->pFilterFFTW[ri+1];
+		free(ct->signal);
+		free(ct->signalFFTW);
